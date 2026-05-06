@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SCADA Motor Interface with Roles</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body {
+  background: #1e1e1e;
+  font-family: Arial, sans-serif;
+  color: #fff;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 3D Login Popup */
+#loginPopup {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+#loginBox {
+  background: linear-gradient(145deg, #3a3a3a, #1f1f1f);
+  padding: 30px;
+  border-radius: 20px;
+  border: 2px solid #555;
+  width: 320px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.7), inset 0 3px 8px rgba(255,255,255,0.1), inset 0 -3px 8px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-20px);
+  animation: loginDrop 0.4s ease-out forwards;
+}
+@keyframes loginDrop {
+  0%   { opacity: 0; transform: translateY(-80px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+#loginBox h2 {
+  margin-bottom: 20px;
+  text-shadow: 0 0 8px #000;
+  font-size: 22px;
+}
+#loginBox input {
+  width: 85%;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 10px;
+  border: none;
+  font-size: 16px;
+  background: #2a2a2a;
+  color: #00e676;
+  text-align: center;
+  box-shadow: inset 0 3px 6px rgba(0,0,0,0.6), 0 3px 6px rgba(0,0,0,0.4);
+}
+#loginBox input:focus {
+  outline: none;
+  box-shadow: inset 0 3px 6px rgba(0,0,0,0.8), 0 0 10px #2563eb;
+}
+
+.button3D {
+  width: 150px;
+  height: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2563eb, #1e4db7);
+  box-shadow: 0 6px #0c1e3d, inset 0 -2px 5px rgba(255,255,255,0.2);
+  cursor: pointer;
+  margin-top: 15px;
+}
+.button3D:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px #0c1e3d;
+}
+
+/* Panels */
+.panel {
+  width: 800px;
+  background: #2b2b2b;
+  padding: 20px;
+  border-radius: 15px;
+  border: 2px solid #555;
+  box-shadow: inset 0 0 15px #000, 0 5px 20px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+/* Motor 3D — fixed broken property names */
+.motor {
+  position: relative;
+  width: 460px;
+  height: 240px;
+  margin-bottom: 20px;
+  border-radius: 15px;
+  box-shadow: inset 0 0 20px #000;
+}
+.body {
+  width: 370px;
+  height: 180px;
+  background: linear-gradient(90deg, #555, #888);
+  border-radius: 30px;
+  position: absolute;
+  top: 30px;
+  left: 20px;
+  box-shadow: inset -12px 0 25px rgba(0,0,0,0.35), 0 12px 25px rgba(0,0,0,0.25);
+  transition: background 0.3s;
+}
+.fins {
+  position: absolute;
+  top: 50px;
+  left: 40px;
+  width: 330px;
+  height: 140px;
+}
+.fin {
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #444, #777);
+  margin-bottom: 6px;
+  border-radius: 3px;
+}
+.end-cover {
+  width: 70px;
+  height: 180px;
+  background: linear-gradient(90deg, #999, #bbb);
+  border-radius: 20px;
+  position: absolute;
+  top: 30px;
+  right: -15px;
+  box-shadow: inset -10px 0 12px rgba(0,0,0,0.2);
+}
+.shaft {
+  width: 120px;
+  height: 30px;
+  background: repeating-linear-gradient(90deg, #333, #333 10px, #ccc, #ccc 20px);
+  position: absolute;
+  top: 105px;
+  left: 395px;
+  border-radius: 10px;
+  transform-origin: left center;
+}
+.coupling {
+  width: 36px;
+  height: 36px;
+  background: radial-gradient(circle, #fff, #555);
+  border-radius: 50%;
+  position: absolute;
+  top: 102px;
+  left: 370px;
+}
+.base {
+  width: 290px;
+  height: 35px;
+  background: #444;
+  position: absolute;
+  bottom: 5px;
+  left: 80px;
+  border-radius: 6px;
+  box-shadow: 0 10px 15px rgba(0,0,0,0.4);
+}
+
+/* Animations */
+@keyframes spin       { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+@keyframes shaftSpin  { from { background-position: 0px; }  to  { background-position: 40px; } }
+@keyframes blink      { 0%, 50%, 100% { opacity: 1; }  25%, 75% { opacity: 0; } }
+@keyframes statusGlow {
+  0%   { background-color: #3cb043; box-shadow: 0 0 5px  #3cb043; }
+  50%  { background-color: #66c266; box-shadow: 0 0 20px #66c266; }
+  100% { background-color: #3cb043; box-shadow: 0 0 5px  #3cb043; }
+}
+
+/* Blink class (was missing — caused RUNNING label not to blink) */
+.blink { animation: blink 1s step-start infinite; }
+
+/* Status & Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+.speedBtn { background: linear-gradient(145deg, #f97316, #c6510d); }
+#motorStatus {
+  width: 120px;
+  height: 50px;
+  background: #b00;
+  color: #fff;
+  border-radius: 12px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 5px rgba(0,0,0,0.4);
+}
+
+/* Log Panel */
+#logPanel  { display: none; width: 90%; }
+#logContainer {
+  width: 100%;
+  height: 400px;
+  overflow-y: auto;
+  background: #1c1c1c;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #555;
+}
+
+/* Charts Panel */
+#chartsPanel { display: none; width: 90%; text-align: center; }
+.chart-card {
+  width: 100%;
+  background: #232b38;
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+}
+
+/* Navigation — changed to class to avoid duplicate IDs */
+.navBtns { display: flex; gap: 15px; margin-top: 20px; }
+
+/* DateTime */
+#dateTime {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 16px;
+}
+
+/* Log controls */
+.log-controls {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.log-controls .left, .log-controls .right { display: flex; gap: 8px; align-items: center; }
+.log-controls input[type="text"] {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #111;
+  color: #fff;
+}
+.log-controls select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  border: 1px solid #444;
+}
+.log-entry { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 14px; white-space: pre-wrap; }
+.log-entry.info    { color: #7ef5a8; }
+.log-entry.warning { color: orange; }
+.log-entry.error   { color: #ff6b6b; }
+.pagination { display: flex; gap: 8px; align-items: center; }
+.pagination button { padding: 6px 10px; border-radius: 6px; border: none; background: #2563eb; color: #fff; cursor: pointer; }
+.export-btn { padding: 8px 12px; border-radius: 6px; border: none; background: #0ea5a2; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- Login Popup -->
+<div id="loginPopup">
+  <div id="loginBox">
+    <h2>SCADA Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button id="loginBtn" class="button3D">Login</button>
+    <p id="loginMsg" style="color:red;margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- Motor Panel -->
+<div class="panel" id="motorPanel">
+  <h2>Motor Control Interface</h2>
+  <div id="dateTime">
+    <div id="currentDate">Date: --/--/----</div>
+    <div id="currentTime">Time: --:--:--</div>
+  </div>
+  <div class="motor">
+    <div class="body"></div>
+    <div class="fins">
+      <div class="fin"></div><div class="fin"></div><div class="fin"></div>
+      <div class="fin"></div><div class="fin"></div><div class="fin"></div>
+      <div class="fin"></div><div class="fin"></div><div class="fin"></div>
+      <div class="fin"></div>
+    </div>
+    <div class="end-cover"></div>
+    <div class="shaft" id="shaft"></div>
+    <div class="coupling" id="coupling"></div>
+    <div class="base"></div>
+  </div>
+  <div class="controls">
+    <button id="toggleBtn"  class="button3D">Start</button>
+    <button id="speed1Btn" class="button3D speedBtn">Speed 1</button>
+    <button id="speed2Btn" class="button3D speedBtn">Speed 2</button>
+    <div id="motorStatus">STOPPED</div>
+  </div>
+  <!-- FIX: unique class instead of duplicate id="navBtns" -->
+  <div class="navBtns">
+    <button class="button3D" id="showLogsBtn">Show Logs</button>
+    <button class="button3D" id="showChartsBtn">Show Charts</button>
+  </div>
+</div>
+
+<!-- Log Panel -->
+<div class="panel" id="logPanel">
+  <h2>Motor Log History (Advanced)</h2>
+  <div class="log-controls">
+    <div class="left">
+      <input type="text" id="searchInput" placeholder="Search logs..." oninput="renderLogs()">
+      <select id="levelFilter" onchange="renderLogs()">
+        <option value="ALL">All levels</option>
+        <option value="INFO">INFO</option>
+        <option value="WARNING">WARNING</option>
+        <option value="ERROR">ERROR</option>
+      </select>
+      <select id="pageSize" onchange="changePageSize()">
+        <option value="10">10 / page</option>
+        <option value="25">25 / page</option>
+        <option value="50">50 / page</option>
+      </select>
+    </div>
+    <div class="right">
+      <button class="export-btn" onclick="exportLogs('txt')">Export TXT</button>
+      <button class="export-btn" onclick="exportLogs('csv')">Export CSV</button>
+      <div class="pagination">
+        <button onclick="prevPage()">Prev</button>
+        <span id="pageInfo">1</span>
+        <button onclick="nextPage()">Next</button>
+      </div>
+    </div>
+  </div>
+  <div id="logContainer"></div>
+  <!-- FIX: unique class instead of duplicate id="navBtns" -->
+  <div class="navBtns">
+    <button class="button3D" id="backMotorBtn">Back to Motor</button>
+    <button class="button3D" id="clearLogsBtn">Clear Logs</button>
+  </div>
+</div>
+
+<!-- Charts Panel -->
+<div class="panel" id="chartsPanel">
+  <h2>Motor Speed Charts</h2>
+  <div class="chart-card">
+    <h3>Speed 1 Gauge (RPM)</h3>
+    <canvas id="gauge1" width="600" height="160"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Speed 2 Gauge (RPM)</h3>
+    <canvas id="gauge2" width="600" height="160"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Realtime Speed Chart</h3>
+    <canvas id="lineChart" width="760" height="240"></canvas>
+  </div>
+  <!-- FIX: unique class instead of duplicate id="navBtns" -->
+  <div class="navBtns" style="margin-top:12px;">
+    <button class="button3D" id="backFromChartsBtn">Back to Motor</button>
+  </div>
+</div>
+
+<script>
+// USERS
+const users = [
+  { username: 'admin',    password: 'admin123', role: 'Admin'    },
+  { username: 'engineer', password: 'eng123',   role: 'Engineer' },
+  { username: 'operator', password: 'op123',    role: 'Operator' }
+];
+let currentRole = null;
+
+// LOGIN
+document.getElementById("loginBtn").onclick = () => {
+  const uname = document.getElementById("username").value;
+  const pwd   = document.getElementById("password").value;
+  const user  = users.find(u => u.username === uname && u.password === pwd);
+  if (user) {
+    currentRole = user.role;
+    document.getElementById("loginPopup").style.display = "none";
+    setupPermissions();
+    addLog(`User '${uname}' logged in as ${currentRole}`, 'INFO');
+    renderLogs();
+  } else {
+    document.getElementById("loginMsg").innerText = "Invalid Credentials!";
+  }
+};
+
+// Also allow Enter key to submit login
+document.getElementById("password").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("loginBtn").click();
+});
+
+// MOTOR CONTROL
+let running      = false;
+let currentSpeed = 1;
+const shaft      = document.getElementById("shaft");
+const coupling   = document.getElementById("coupling");
+const motorBody  = document.querySelector(".body");
+const toggleBtn  = document.getElementById("toggleBtn");
+const motorStatus = document.getElementById("motorStatus");
+
+// LOG HISTORY
+let logHistory = JSON.parse(localStorage.getItem("motorLogs")) || [];
+const LOG_KEY  = "motorLogs";
+
+function persistLogs() {
+  localStorage.setItem(LOG_KEY, JSON.stringify(logHistory));
+}
+
+function addLog(msg, level = 'INFO') {
+  const now   = new Date();
+  const date  = now.toLocaleDateString('en-GB');
+  const time  = now.toLocaleTimeString();
+  const entry = { date, time, level: level.toUpperCase(), msg };
+  logHistory.push(entry);
+  persistLogs();
+}
+
+// Pagination state
+let currentPage = 1;
+let pageSize    = 10;
+
+function changePageSize() {
+  pageSize    = parseInt(document.getElementById('pageSize').value, 10);
+  currentPage = 1;
+  renderLogs();
+}
+
+function formatEntry(entry) {
+  return `${entry.date} ${entry.time} | ${entry.level} | ${entry.msg}`;
+}
+
+function getFiltered() {
+  logHistory = JSON.parse(localStorage.getItem(LOG_KEY)) || [];
+  const searchQ     = document.getElementById('searchInput').value.trim().toLowerCase();
+  const levelFilter = document.getElementById('levelFilter').value;
+  return logHistory.filter(e => {
+    if (levelFilter !== 'ALL' && e.level !== levelFilter) return false;
+    if (searchQ.length > 0) {
+      const hay = (e.date + ' ' + e.time + ' ' + e.level + ' ' + e.msg).toLowerCase();
+      return hay.includes(searchQ);
+    }
+    return true;
+  });
+}
+
+function renderLogs() {
+  const filtered   = getFiltered();
+  const total      = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start     = (currentPage - 1) * pageSize;
+  const pageSlice = filtered.slice(start, start + pageSize);
+
+  const container = document.getElementById('logContainer');
+  container.innerHTML = '';
+  if (pageSlice.length === 0) {
+    container.innerHTML = '<div style="padding:12px;color:#bbb;">No logs to show.</div>';
+  } else {
+    pageSlice.forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'log-entry ' + e.level.toLowerCase();
+      div.innerText  = formatEntry(e);
+      container.appendChild(div);
+    });
+  }
+  document.getElementById('pageInfo').innerText =
+    `${currentPage} / ${totalPages} (${total} items)`;
+}
+
+function nextPage() {
+  const totalPages = Math.max(1, Math.ceil(getFiltered().length / pageSize));
+  if (currentPage < totalPages) { currentPage++; renderLogs(); }
+}
+function prevPage() {
+  if (currentPage > 1) { currentPage--; renderLogs(); }
+}
+
+function exportLogs(type) {
+  const filtered = getFiltered();
+  if (type === 'txt') {
+    const txt  = filtered.map(e => `${e.date} ${e.time} | ${e.level} | ${e.msg}`).join('\n');
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `motor_logs_${new Date().toISOString().slice(0,19)}.txt`;
+    a.click();
+  } else if (type === 'csv') {
+    const header = 'Date,Time,Level,Message\n';
+    const rows   = filtered.map(e => {
+      const msg = `"${String(e.msg).replace(/"/g, '""')}"`;
+      return `${e.date},${e.time},${e.level},${msg}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `motor_logs_${new Date().toISOString().slice(0,19)}.csv`;
+    a.click();
+  }
+}
+
+function clearLogs() {
+  if (!confirm('Clear all logs?')) return;
+  logHistory = [];
+  persistLogs();
+  renderLogs();
+}
+
+// ROLE PERMISSIONS
+function setupPermissions() {
+  if (currentRole === "Operator") {
+    document.getElementById("speed1Btn").disabled   = true;
+    document.getElementById("speed2Btn").disabled   = true;
+    document.getElementById("clearLogsBtn").disabled = true;
+  }
+  if (currentRole === "Engineer") {
+    document.getElementById("clearLogsBtn").disabled = true;
+  }
+}
+
+// START / STOP MOTOR
+toggleBtn.onclick = () => {
+  running = !running;
+  if (running) {
+    const dur = currentSpeed === 2 ? '0.2s' : '0.4s';
+    shaft.style.animation    = `shaftSpin ${dur} linear infinite`;
+    coupling.style.animation = `spin ${dur} linear infinite`;
+    // FIX: clear any inline background-color so statusGlow animation takes over
+    motorBody.style.background       = "linear-gradient(90deg,#3cb043,#66c266)";
+    motorStatus.style.backgroundColor = '';
+    motorStatus.style.animation       = "statusGlow 1s infinite";
+    motorStatus.innerHTML = "<span class='blink'>RUNNING</span>";
+    toggleBtn.innerText   = "Stop";
+    addLog(`Motor Started (Speed ${currentSpeed}) by ${currentRole || 'Unknown'}`, 'INFO');
+  } else {
+    shaft.style.animation    = "none";
+    coupling.style.animation = "none";
+    motorBody.style.background        = "linear-gradient(90deg,#555,#888)";
+    motorStatus.style.animation       = "none";
+    motorStatus.style.backgroundColor = "#b00";
+    motorStatus.innerHTML = "STOPPED";
+    toggleBtn.innerText   = "Start";
+    addLog(`Motor Stopped by ${currentRole || 'Unknown'}`, 'INFO');
+  }
+  renderLogs();
+};
+
+// SPEED CONTROL
+document.getElementById("speed1Btn").onclick = () => {
+  if (!running) return;
+  currentSpeed = 1;
+  shaft.style.animation    = "shaftSpin 0.4s linear infinite";
+  coupling.style.animation = "spin 0.4s linear infinite";
+  addLog(`Speed changed to Speed 1 by ${currentRole || 'Unknown'}`, 'INFO');
+  renderLogs();
+};
+document.getElementById("speed2Btn").onclick = () => {
+  if (!running) return;
+  currentSpeed = 2;
+  shaft.style.animation    = "shaftSpin 0.2s linear infinite";
+  coupling.style.animation = "spin 0.2s linear infinite";
+  addLog(`Speed changed to Speed 2 by ${currentRole || 'Unknown'}`, 'INFO');
+  renderLogs();
+};
+
+// NAVIGATION
+document.getElementById("showLogsBtn").onclick = () => {
+  document.getElementById("motorPanel").style.display  = "none";
+  document.getElementById("logPanel").style.display    = "flex";
+  document.getElementById("chartsPanel").style.display = "none";
+  currentPage = 1;
+  renderLogs();
+};
+document.getElementById("backMotorBtn").onclick = () => {
+  document.getElementById("logPanel").style.display   = "none";
+  document.getElementById("motorPanel").style.display = "flex";
+};
+document.getElementById("clearLogsBtn").onclick = () => { clearLogs(); };
+
+document.getElementById("showChartsBtn").onclick = () => {
+  document.getElementById("motorPanel").style.display  = "none";
+  document.getElementById("logPanel").style.display    = "none";
+  document.getElementById("chartsPanel").style.display = "flex";
+};
+document.getElementById("backFromChartsBtn").onclick = () => {
+  document.getElementById("chartsPanel").style.display = "none";
+  document.getElementById("motorPanel").style.display  = "flex";
+};
+
+// Auto-refresh logs every 2 s (only when log panel is visible)
+setInterval(() => {
+  if (document.getElementById('logPanel').style.display !== 'none') renderLogs();
+}, 2000);
+
+// Live Date & Time
+function updateDateTime() {
+  const now = new Date();
+  document.getElementById("currentDate").innerText = "Date: " + now.toLocaleDateString('en-GB');
+  document.getElementById("currentTime").innerText = "Time: " + now.toLocaleTimeString();
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+// Initial log render
+renderLogs();
+
+// -------------------------
+// Charts
+// -------------------------
+const maxPoints  = 60;
+let chartLabels  = [];
+let chartData1   = [];
+let chartData2   = [];
+let smooth1 = 0;
+let smooth2 = 0;
+
+const lineCtx = document.getElementById('lineChart').getContext('2d');
+const speedLineChart = new Chart(lineCtx, {
+  type: 'line',
+  data: {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'Speed 1 (RPM)',
+        data: chartData1,
+        borderColor: '#00e676',
+        backgroundColor: 'rgba(0,230,118,0.06)',
+        tension: 0.25, pointRadius: 0, borderWidth: 2
+      },
+      {
+        label: 'Speed 2 (RPM)',
+        data: chartData2,
+        borderColor: '#1e90ff',
+        backgroundColor: 'rgba(30,144,255,0.06)',
+        tension: 0.25, pointRadius: 0, borderWidth: 2
+      }
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    scales: { y: { beginAtZero: true, suggestedMax: 1300 } },
+    plugins: { legend: { display: true } }
+  }
+});
+
+function drawGauge(canvasId, value, maxValue, color) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h - 10;
+  const radius = Math.min(w / 2 - 20, h - 30);
+  // background arc
+  ctx.lineWidth = 18;
+  ctx.strokeStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, Math.PI, 0, false);
+  ctx.stroke();
+  // value arc
+  const clamped = Math.max(0, Math.min(value, maxValue));
+  const angle = Math.PI * (clamped / maxValue);
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, Math.PI, Math.PI + angle, false);
+  ctx.stroke();
+  // ticks
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 0; i <= 10; i++) {
+    const a  = Math.PI + (Math.PI * (i / 10));
+    const x1 = cx + (radius - 10) * Math.cos(a);
+    const y1 = cy + (radius - 10) * Math.sin(a);
+    const x2 = cx + (radius + 2)  * Math.cos(a);
+    const y2 = cy + (radius + 2)  * Math.sin(a);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  // text
+  ctx.font = '22px Arial';
+  ctx.fillStyle = '#fff';
+  const txt = Math.round(value) + ' RPM';
+  ctx.fillText(txt, cx - ctx.measureText(txt).width / 2, cy - radius / 2);
+}
+
+function updateChartsOnce() {
+  const noise1 = (Math.random() - 0.5) * 15;
+  const noise2 = (Math.random() - 0.5) * 15;
+  const target1 = (running && currentSpeed === 1) ? 600  : 0;
+  const target2 = (running && currentSpeed === 2) ? 1200 : 0;
+  smooth1 += (target1 + noise1 - smooth1) * 0.12;
+  smooth2 += (target2 + noise2 - smooth2) * 0.12;
+
+  const tlabel = new Date().toLocaleTimeString();
+  chartLabels.push(tlabel);
+  chartData1.push(Math.round(smooth1));
+  chartData2.push(Math.round(smooth2));
+  if (chartLabels.length > maxPoints) {
+    chartLabels.shift(); chartData1.shift(); chartData2.shift();
+  }
+  speedLineChart.update();
+  drawGauge('gauge1', smooth1, 1300, '#00e676');
+  drawGauge('gauge2', smooth2, 1300, '#1e90ff');
+}
+
+setInterval(() => {
+  if (document.getElementById('chartsPanel').style.display !== 'none') {
+    updateChartsOnce();
+  } else {
+    // Keep smoothing values updated in background
+    const noise1 = (Math.random() - 0.5) * 15;
+    const noise2 = (Math.random() - 0.5) * 15;
+    const target1 = (running && currentSpeed === 1) ? 600  : 0;
+    const target2 = (running && currentSpeed === 2) ? 1200 : 0;
+    smooth1 += (target1 + noise1 - smooth1) * 0.12;
+    smooth2 += (target2 + noise2 - smooth2) * 0.12;
+  }
+}, 1000);
+
+updateChartsOnce();
+</script>
+</body>
+</html>
